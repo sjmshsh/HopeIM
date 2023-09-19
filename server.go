@@ -48,6 +48,7 @@ type Channel interface {
 	Conn
 	Agent
 	Close() error
+	// Readloop 阻塞的方法，它把消息和心跳处理封装在一起
 	Readloop(lst MessageListener) error
 	SetWriteWait(duration time.Duration)
 	SetReadWait(duration time.Duration)
@@ -60,6 +61,8 @@ type MessageListener interface {
 // Agent 表示发送方
 type Agent interface {
 	ID() string
+	// Push 这是一个线程安全的发送数据的方法, 并且我们在channel中实现了
+	// 消息的异步批量发送
 	Push([]byte) error
 }
 

@@ -57,7 +57,6 @@ func (c *Client) ID() string {
 	return c.id
 }
 
-// Name Name
 func (c *Client) Name() string {
 	return c.name
 }
@@ -165,6 +164,7 @@ func (c *Client) heartbealoop(conn net.Conn) error {
 func (c *Client) ping(conn net.Conn) error {
 	c.Lock()
 	defer c.Unlock()
+	// 只要设置过一次SetWriteDeadline，以后每次写消息都要重置这个时间，否则连接就会中断。读者可以测试下
 	err := conn.SetWriteDeadline(time.Now().Add(c.options.WriteWait))
 	if err != nil {
 		return err

@@ -73,6 +73,7 @@ func (ch *ChannelImpl) writeloop() error {
 func (ch *ChannelImpl) ID() string { return ch.id }
 
 // Push 异步写数据
+// 发送的消息直接通过writechan发送给了一个独立的goruntine中的writeloop执行，这样就使得Push变成了一个线程安全的方法
 func (ch *ChannelImpl) Push(payload []byte) error {
 	if ch.closed.HasFired() {
 		return fmt.Errorf("channel %s has closed", ch.id)
@@ -110,6 +111,7 @@ func (ch *ChannelImpl) SetReadWait(readwait time.Duration) {
 	ch.writeWait = readwait
 }
 
+// Readloop 这是一个阻塞方法，并且只允许被一个线程读取，因此我们直接在前面加了锁, ch.Lock()，防止上层多次调用
 func (ch *ChannelImpl) Readloop(lst MessageListener) error {
 	ch.Lock()
 	defer ch.Unlock()
@@ -137,6 +139,8 @@ func (ch *ChannelImpl) Readloop(lst MessageListener) error {
 		if len(payload) == 0 {
 			continue
 		}
+		// Channel的生命周期是被通信层中的Server管理的
+		// 因此不希望Channel被上层消息处理器直接操作，比如误调用Close()导致连接关闭
 		go lst.Receive(ch, payload)
 	}
 }

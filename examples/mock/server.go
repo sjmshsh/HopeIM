@@ -54,7 +54,7 @@ func (h *ServerHandler) Accept(conn HopeIM.Conn, timeout time.Duration) (string,
 }
 
 func (h *ServerHandler) Receive(ag HopeIM.Agent, payload []byte) {
-	ack := string(payload) + " from srever"
+	ack := string(payload) + " from server"
 	_ = ag.Push([]byte(ack))
 }
 

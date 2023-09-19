@@ -72,9 +72,11 @@ func (s *Server) Start() error {
 		}
 
 		// step 2 包装conn
+		// 把net.Conn包装成HopeIM.Conn
 		conn := NewConn(rawconn)
 
 		// step 3
+		// 回调给上层业务完成权限认证之类的逻辑处理
 		id, err := s.Accept(conn, s.options.loginwait)
 		if err != nil {
 			_ = conn.WriteFrame(HopeIM.OpClose, []byte(err.Error()))
@@ -91,6 +93,7 @@ func (s *Server) Start() error {
 		channel := HopeIM.NewChannel(id, conn)
 		channel.SetWriteWait(s.options.writewait)
 		channel.SetReadWait(s.options.readwait)
+		// 添加到连接管理器
 		s.Add(channel)
 
 		go func(ch HopeIM.Channel) {
