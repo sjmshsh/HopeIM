@@ -2,26 +2,28 @@ package tcp
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"github.com/segmentio/ksuid"
-	"github.com/sjmshsh/HopeIM"
-	"github.com/sjmshsh/HopeIM/logger"
-	"github.com/sjmshsh/HopeIM/naming"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/sjmshsh/HopeIM"
+	"github.com/sjmshsh/HopeIM/logger"
+
+	"github.com/segmentio/ksuid"
 )
 
+// ServerOptions ServerOptions
 type ServerOptions struct {
-	loginwait time.Duration // 登录超时
-	readwait  time.Duration // 读超时
-	writewait time.Duration // 读超时
+	loginwait time.Duration //登录超时
+	readwait  time.Duration //读超时
+	writewait time.Duration //读超时
 }
 
+// Server is a websocket implement of the Server
 type Server struct {
 	listen string
-	naming.ServiceRegistration
+	HopeIM.ServiceRegistration
 	HopeIM.ChannelMap
 	HopeIM.Acceptor
 	HopeIM.MessageListener
@@ -31,7 +33,8 @@ type Server struct {
 	quit    *HopeIM.Event
 }
 
-func NewServer(listen string, service naming.ServiceRegistration) HopeIM.Server {
+// NewServer NewServer
+func NewServer(listen string, service HopeIM.ServiceRegistration) HopeIM.Server {
 	return &Server{
 		listen:              listen,
 		ServiceRegistration: service,
@@ -45,6 +48,7 @@ func NewServer(listen string, service naming.ServiceRegistration) HopeIM.Server 
 	}
 }
 
+// Start server
 func (s *Server) Start() error {
 	log := logger.WithFields(logger.Fields{
 		"module": "tcp.server",
@@ -109,8 +113,10 @@ func (s *Server) Start() error {
 		default:
 		}
 	}
+
 }
 
+// Shutdown Shutdown
 func (s *Server) Shutdown(ctx context.Context) error {
 	log := logger.WithFields(logger.Fields{
 		"module": "tcp.server",
@@ -120,8 +126,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		defer func() {
 			log.Infoln("shutdown")
 		}()
-		channels := s.ChannelMap.All()
-		for _, ch := range channels {
+		// close channels
+		chanels := s.ChannelMap.All()
+		for _, ch := range chanels {
 			ch.Close()
 
 			select {
@@ -131,39 +138,48 @@ func (s *Server) Shutdown(ctx context.Context) error {
 				continue
 			}
 		}
+
 	})
 	return nil
 }
 
+// string channelID
+// []byte data
 func (s *Server) Push(id string, data []byte) error {
 	ch, ok := s.ChannelMap.Get(id)
 	if !ok {
-		return errors.New("channel no found")
+		return fmt.Errorf("channel %s no found", id)
 	}
 	return ch.Push(data)
 }
 
-func (s *Server) SetChannelMap(channels HopeIM.ChannelMap) {
-	s.ChannelMap = channels
-}
-
-func (s *Server) SetReadWait(readwait time.Duration) {
-	s.options.readwait = readwait
-}
-
-func (s *Server) SetStateListener(listener HopeIM.StateListener) {
-	s.StateListener = listener
-}
-
-func (s *Server) SetMessageListener(listener HopeIM.MessageListener) {
-	s.MessageListener = listener
-}
-
+// SetAcceptor SetAcceptor
 func (s *Server) SetAcceptor(acceptor HopeIM.Acceptor) {
 	s.Acceptor = acceptor
 }
 
-type defaultAcceptor struct{}
+// SetMessageListener SetMessageListener
+func (s *Server) SetMessageListener(listener HopeIM.MessageListener) {
+	s.MessageListener = listener
+}
+
+// SetStateListener SetStateListener
+func (s *Server) SetStateListener(listener HopeIM.StateListener) {
+	s.StateListener = listener
+}
+
+// SetReadWait set read wait duration
+func (s *Server) SetReadWait(readwait time.Duration) {
+	s.options.readwait = readwait
+}
+
+// SetChannels SetChannels
+func (s *Server) SetChannelMap(channels HopeIM.ChannelMap) {
+	s.ChannelMap = channels
+}
+
+type defaultAcceptor struct {
+}
 
 // Accept defaultAcceptor
 func (a *defaultAcceptor) Accept(conn HopeIM.Conn, timeout time.Duration) (string, error) {

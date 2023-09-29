@@ -5,11 +5,10 @@ import (
 	"sync"
 )
 
-// ChannelMap 连接管理器
 type ChannelMap interface {
 	Add(channel Channel)
 	Remove(id string)
-	Get(id string) (Channel, bool)
+	Get(id string) (channel Channel, ok bool)
 	All() []Channel
 }
 
@@ -17,12 +16,14 @@ type ChannelsImpl struct {
 	channels *sync.Map
 }
 
+// NewChannels NewChannels
 func NewChannels(num int) ChannelMap {
 	return &ChannelsImpl{
 		channels: new(sync.Map),
 	}
 }
 
+// Add addChannel
 func (ch *ChannelsImpl) Add(channel Channel) {
 	if channel.ID() == "" {
 		logger.WithFields(logger.Fields{
@@ -33,10 +34,12 @@ func (ch *ChannelsImpl) Add(channel Channel) {
 	ch.channels.Store(channel.ID(), channel)
 }
 
+// Remove addChannel
 func (ch *ChannelsImpl) Remove(id string) {
 	ch.channels.Delete(id)
 }
 
+// Get Get
 func (ch *ChannelsImpl) Get(id string) (Channel, bool) {
 	if id == "" {
 		logger.WithFields(logger.Fields{
@@ -51,9 +54,10 @@ func (ch *ChannelsImpl) Get(id string) (Channel, bool) {
 	return val.(Channel), true
 }
 
+// All return channels
 func (ch *ChannelsImpl) All() []Channel {
 	arr := make([]Channel, 0)
-	ch.channels.Range(func(key, val any) bool {
+	ch.channels.Range(func(key, val interface{}) bool {
 		arr = append(arr, val.(Channel))
 		return true
 	})

@@ -1,9 +1,10 @@
 package websocket
 
 import (
+	"net"
+
 	"github.com/gobwas/ws"
 	"github.com/sjmshsh/HopeIM"
-	"net"
 )
 
 type Frame struct {

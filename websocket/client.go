@@ -3,8 +3,6 @@ package websocket
 import (
 	"errors"
 	"fmt"
-	"github.com/sjmshsh/HopeIM"
-	"github.com/sjmshsh/HopeIM/logger"
 	"net"
 	"net/url"
 	"sync"
@@ -13,11 +11,13 @@ import (
 
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	"github.com/sjmshsh/HopeIM"
+	"github.com/sjmshsh/HopeIM/logger"
 )
 
 // ClientOptions ClientOptions
 type ClientOptions struct {
-	Heartbeat time.Duration //登陆超时
+	Heartbeat time.Duration //登录超时
 	ReadWait  time.Duration //读超时
 	WriteWait time.Duration //写超时
 }
@@ -32,11 +32,15 @@ type Client struct {
 	conn    net.Conn
 	state   int32
 	options ClientOptions
-	dc      *HopeIM.DialerContext
+	Meta    map[string]string
 }
 
 // NewClient NewClient
 func NewClient(id, name string, opts ClientOptions) HopeIM.Client {
+	return NewClientWithProps(id, name, make(map[string]string), opts)
+}
+
+func NewClientWithProps(id, name string, meta map[string]string, opts ClientOptions) HopeIM.Client {
 	if opts.WriteWait == 0 {
 		opts.WriteWait = HopeIM.DefaultWriteWait
 	}
@@ -48,17 +52,9 @@ func NewClient(id, name string, opts ClientOptions) HopeIM.Client {
 		id:      id,
 		name:    name,
 		options: opts,
+		Meta:    meta,
 	}
 	return cli
-}
-
-// ID return id
-func (c *Client) ID() string {
-	return c.id
-}
-
-func (c *Client) Name() string {
-	return c.name
 }
 
 // Connect to server
@@ -131,6 +127,7 @@ func (c *Client) Close() {
 	})
 }
 
+// Read a frame ,this function is not safey for concurrent
 func (c *Client) Read() (HopeIM.Frame, error) {
 	if c.conn == nil {
 		return nil, errors.New("connection is nil")
@@ -164,11 +161,24 @@ func (c *Client) heartbealoop(conn net.Conn) error {
 func (c *Client) ping(conn net.Conn) error {
 	c.Lock()
 	defer c.Unlock()
-	// 只要设置过一次SetWriteDeadline，以后每次写消息都要重置这个时间，否则连接就会中断。读者可以测试下
 	err := conn.SetWriteDeadline(time.Now().Add(c.options.WriteWait))
 	if err != nil {
 		return err
 	}
 	logger.Tracef("%s send ping to server", c.id)
 	return wsutil.WriteClientMessage(conn, ws.OpPing, nil)
+}
+
+// ID return id
+func (c *Client) ServiceID() string {
+	return c.id
+}
+
+// Name Name
+func (c *Client) ServiceName() string {
+	return c.name
+}
+
+func (c *Client) GetMeta() map[string]string {
+	return c.Meta
 }

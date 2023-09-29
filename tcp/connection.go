@@ -1,13 +1,14 @@
 package tcp
 
 import (
-	"bufio"
-	"github.com/sjmshsh/HopeIM"
-	"github.com/sjmshsh/HopeIM/wire/endian"
 	"io"
 	"net"
+
+	"github.com/sjmshsh/HopeIM"
+	"github.com/sjmshsh/HopeIM/wire/endian"
 )
 
+// Frame Frame
 type Frame struct {
 	OpCode  HopeIM.OpCode
 	Payload []byte
@@ -33,32 +34,45 @@ func (f *Frame) GetPayload() []byte {
 	return f.Payload
 }
 
+// Conn Conn
 type TcpConn struct {
 	net.Conn
-	rd *bufio.Reader
-	wr *bufio.Writer
 }
 
-func NewConn(conn net.Conn) HopeIM.Conn {
+// NewConn NewConn
+func NewConn(conn net.Conn) *TcpConn {
 	return &TcpConn{
 		Conn: conn,
-		rd:   bufio.NewReaderSize(conn, 4096),
-		wr:   bufio.NewWriterSize(conn, 1024),
 	}
 }
 
-func NewConnWithRW(conn net.Conn, rd *bufio.Reader, wr *bufio.Writer) *TcpConn {
-	return &TcpConn{
-		Conn: conn,
-		rd:   rd,
-		wr:   wr,
+// ReadFrame ReadFrame
+func (c *TcpConn) ReadFrame() (HopeIM.Frame, error) {
+	opcode, err := endian.ReadUint8(c.Conn)
+	if err != nil {
+		return nil, err
 	}
+	payload, err := endian.ReadBytes(c.Conn)
+	if err != nil {
+		return nil, err
+	}
+	return &Frame{
+		OpCode:  HopeIM.OpCode(opcode),
+		Payload: payload,
+	}, nil
 }
 
+// WriteFrame WriteFrame
+func (c *TcpConn) WriteFrame(code HopeIM.OpCode, payload []byte) error {
+	return WriteFrame(c.Conn, code, payload)
+}
+
+// Flush Flush
 func (c *TcpConn) Flush() error {
-	return c.wr.Flush()
+	return nil
 }
 
+// WriteFrame write a frame to w
 func WriteFrame(w io.Writer, code HopeIM.OpCode, payload []byte) error {
 	if err := endian.WriteUint8(w, uint8(code)); err != nil {
 		return err
@@ -67,23 +81,4 @@ func WriteFrame(w io.Writer, code HopeIM.OpCode, payload []byte) error {
 		return err
 	}
 	return nil
-}
-
-func (c *TcpConn) WriteFrame(code HopeIM.OpCode, payload []byte) error {
-	return WriteFrame(c.wr, code, payload)
-}
-
-func (c *TcpConn) ReadFrame() (HopeIM.Frame, error) {
-	opcode, err := endian.ReadUint8(c.rd)
-	if err != nil {
-		return nil, err
-	}
-	payload, err := endian.ReadBytes(c.rd)
-	if err != nil {
-		return nil, err
-	}
-	return &Frame{
-		OpCode:  HopeIM.OpCode(opcode),
-		Payload: payload,
-	}, nil
 }

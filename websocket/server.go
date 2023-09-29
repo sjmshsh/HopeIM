@@ -4,18 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/gobwas/ws"
 	"github.com/segmentio/ksuid"
 	"github.com/sjmshsh/HopeIM"
 	"github.com/sjmshsh/HopeIM/logger"
-	"github.com/sjmshsh/HopeIM/naming"
-	"net/http"
-	"sync"
-	"time"
 )
 
+// ServerOptions ServerOptions
 type ServerOptions struct {
-	loginwait time.Duration //登陆超时
+	loginwait time.Duration //登录超时
 	readwait  time.Duration //读超时
 	writewait time.Duration //写超时
 }
@@ -23,7 +24,7 @@ type ServerOptions struct {
 // Server is a websocket implement of the Server
 type Server struct {
 	listen string
-	naming.ServiceRegistration
+	HopeIM.ServiceRegistration
 	HopeIM.ChannelMap
 	HopeIM.Acceptor
 	HopeIM.MessageListener
@@ -33,18 +34,19 @@ type Server struct {
 }
 
 // NewServer NewServer
-func NewServer(listen string, service naming.ServiceRegistration) HopeIM.Server {
+func NewServer(listen string, service HopeIM.ServiceRegistration) HopeIM.Server {
 	return &Server{
 		listen:              listen,
 		ServiceRegistration: service,
 		options: ServerOptions{
 			loginwait: HopeIM.DefaultLoginWait,
 			readwait:  HopeIM.DefaultReadWait,
-			writewait: time.Second * 10,
+			writewait: HopeIM.DefaultWriteWait,
 		},
 	}
 }
 
+// Start server
 func (s *Server) Start() error {
 	mux := http.NewServeMux()
 	log := logger.WithFields(logger.Fields{
@@ -72,11 +74,9 @@ func (s *Server) Start() error {
 		}
 
 		// step 2 包装conn
-		// 把net.Conn包装成HopeIM.Conn
 		conn := NewConn(rawconn)
 
 		// step 3
-		// 回调给上层业务完成权限认证之类的逻辑处理
 		id, err := s.Accept(conn, s.options.loginwait)
 		if err != nil {
 			_ = conn.WriteFrame(HopeIM.OpClose, []byte(err.Error()))
@@ -93,7 +93,6 @@ func (s *Server) Start() error {
 		channel := HopeIM.NewChannel(id, conn)
 		channel.SetWriteWait(s.options.writewait)
 		channel.SetReadWait(s.options.readwait)
-		// 添加到连接管理器
 		s.Add(channel)
 
 		go func(ch HopeIM.Channel) {
@@ -110,11 +109,13 @@ func (s *Server) Start() error {
 			}
 			ch.Close()
 		}(channel)
+
 	})
 	log.Infoln("started")
 	return http.ListenAndServe(s.listen, mux)
 }
 
+// Shutdown Shutdown
 func (s *Server) Shutdown(ctx context.Context) error {
 	log := logger.WithFields(logger.Fields{
 		"module": "ws.server",
@@ -125,8 +126,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 			log.Infoln("shutdown")
 		}()
 		// close channels
-		channels := s.ChannelMap.All()
-		for _, ch := range channels {
+		chanels := s.ChannelMap.All()
+		for _, ch := range chanels {
 			ch.Close()
 
 			select {
@@ -136,10 +137,13 @@ func (s *Server) Shutdown(ctx context.Context) error {
 				continue
 			}
 		}
+
 	})
 	return nil
 }
 
+// string channelID
+// []byte data
 func (s *Server) Push(id string, data []byte) error {
 	ch, ok := s.ChannelMap.Get(id)
 	if !ok {

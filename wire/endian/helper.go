@@ -1,3 +1,7 @@
+// Copyright (c) 2013-2016 The btcsuite developers
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 package endian
 
 import (
@@ -5,18 +9,18 @@ import (
 	"io"
 )
 
-var Default = binary.BigEndian
+var Default = binary.LittleEndian
 
-// ReadUint8 从reader中读取一共uint8
+// ReadUint8 从 reader 中读取一个 uint8
 func ReadUint8(r io.Reader) (uint8, error) {
 	var bytes = make([]byte, 1)
 	if _, err := io.ReadFull(r, bytes); err != nil {
 		return 0, err
 	}
-	return bytes[0], nil
+	return uint8(bytes[0]), nil
 }
 
-// ReadUint32 从reader中读取一共uint32
+// ReadUint32 从 reader 中读取一个 uint32
 func ReadUint32(r io.Reader) (uint32, error) {
 	var bytes = make([]byte, 4)
 	if _, err := io.ReadFull(r, bytes); err != nil {
@@ -66,7 +70,7 @@ func ReadBytes(r io.Reader) ([]byte, error) {
 	return buf, nil
 }
 
-// ReadFixedBytes 读取固定长度的字节
+//ReadFixedBytes 读取固定长度的字节
 func ReadFixedBytes(len int, r io.Reader) ([]byte, error) {
 	buf := make([]byte, len)
 	_, err := io.ReadFull(r, buf)

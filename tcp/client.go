@@ -3,20 +3,23 @@ package tcp
 import (
 	"errors"
 	"fmt"
-	"github.com/sjmshsh/HopeIM"
-	"github.com/sjmshsh/HopeIM/logger"
 	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/sjmshsh/HopeIM"
+	"github.com/sjmshsh/HopeIM/logger"
 )
 
+// ClientOptions ClientOptions
 type ClientOptions struct {
-	Heartbeat time.Duration // 登录超时
-	ReadWait  time.Duration // 读超时
-	WriteWait time.Duration // 写超时
+	Heartbeat time.Duration //登录超时
+	ReadWait  time.Duration //读超时
+	WriteWait time.Duration //写超时
 }
 
+// Client is a websocket implement of the terminal
 type Client struct {
 	sync.Mutex
 	HopeIM.Dialer
@@ -26,41 +29,42 @@ type Client struct {
 	conn    HopeIM.Conn
 	state   int32
 	options ClientOptions
+	Meta    map[string]string
 }
 
 // NewClient NewClient
 func NewClient(id, name string, opts ClientOptions) HopeIM.Client {
+	return NewClientWithProps(id, name, make(map[string]string), opts)
+}
+
+func NewClientWithProps(id, name string, meta map[string]string, opts ClientOptions) HopeIM.Client {
 	if opts.WriteWait == 0 {
 		opts.WriteWait = HopeIM.DefaultWriteWait
 	}
 	if opts.ReadWait == 0 {
 		opts.ReadWait = HopeIM.DefaultReadWait
 	}
+
 	cli := &Client{
 		id:      id,
 		name:    name,
 		options: opts,
+		Meta:    meta,
 	}
 	return cli
 }
 
-func (c *Client) ID() string {
-	return c.id
-}
-
-func (c *Client) Name() string {
-	return c.name
-}
-
+// Connect to server
 func (c *Client) Connect(addr string) error {
 	_, err := url.Parse(addr)
 	if err != nil {
 		return err
 	}
-	// 这里是一个CAS原子操作，对比设置值，是并发安全的
+	// 这里是一个CAS原子操作，对比并设置值，是并发安全的。
 	if !atomic.CompareAndSwapInt32(&c.state, 0, 1) {
 		return fmt.Errorf("client has connected")
 	}
+
 	rawconn, err := c.Dialer.DialAndHandshake(HopeIM.DialerContext{
 		Id:      c.id,
 		Name:    c.name,
@@ -78,7 +82,7 @@ func (c *Client) Connect(addr string) error {
 
 	if c.options.Heartbeat > 0 {
 		go func() {
-			err := c.heartbeatloop()
+			err := c.heartbealoop()
 			if err != nil {
 				logger.WithField("module", "tcp.client").Warn("heartbealoop stopped - ", err)
 			}
@@ -87,10 +91,12 @@ func (c *Client) Connect(addr string) error {
 	return nil
 }
 
+// SetDialer 设置握手逻辑
 func (c *Client) SetDialer(dialer HopeIM.Dialer) {
 	c.Dialer = dialer
 }
 
+//Send data to connection
 func (c *Client) Send(payload []byte) error {
 	if atomic.LoadInt32(&c.state) == 0 {
 		return fmt.Errorf("connection is nil")
@@ -118,7 +124,24 @@ func (c *Client) Close() {
 	})
 }
 
-func (c *Client) heartbeatloop() error {
+func (c *Client) Read() (HopeIM.Frame, error) {
+	if c.conn == nil {
+		return nil, errors.New("connection is nil")
+	}
+	if c.options.Heartbeat > 0 {
+		_ = c.conn.SetReadDeadline(time.Now().Add(c.options.ReadWait))
+	}
+	frame, err := c.conn.ReadFrame()
+	if err != nil {
+		return nil, err
+	}
+	if frame.GetOpCode() == HopeIM.OpClose {
+		return nil, errors.New("remote side close the channel")
+	}
+	return frame, nil
+}
+
+func (c *Client) heartbealoop() error {
 	tick := time.NewTicker(c.options.Heartbeat)
 	for range tick.C {
 		// 发送一个ping的心跳包给服务端
@@ -139,19 +162,13 @@ func (c *Client) ping() error {
 	return c.conn.WriteFrame(HopeIM.OpPing, nil)
 }
 
-func (c *Client) Read() (HopeIM.Frame, error) {
-	if c.conn == nil {
-		return nil, errors.New("connection is nil")
-	}
-	if c.options.Heartbeat > 0 {
-		_ = c.conn.SetReadDeadline(time.Now().Add(c.options.ReadWait))
-	}
-	frame, err := c.conn.ReadFrame()
-	if err != nil {
-		return nil, err
-	}
-	if frame.GetOpCode() == HopeIM.OpClose {
-		return nil, errors.New("remote side close the channel")
-	}
-	return frame, nil
+// ID return id
+func (c *Client) ServiceID() string {
+	return c.id
 }
+
+// Name Name
+func (c *Client) ServiceName() string {
+	return c.name
+}
+func (c *Client) GetMeta() map[string]string { return c.Meta }
