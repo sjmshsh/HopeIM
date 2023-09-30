@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"github.com/go-redis/redis/v7"
 	"github.com/golang/protobuf/proto"
 	"github.com/sjmshsh/HopeIM"
 	"github.com/sjmshsh/HopeIM/wire/pkt"
